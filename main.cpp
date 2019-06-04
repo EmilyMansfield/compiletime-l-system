@@ -122,8 +122,8 @@ template <class T, class Arr> void getName(Arr &arr) { getName<0, T>(arr); }
 struct A : Symbol<'A'> {};
 struct B : Symbol<'B'> {};
 
-em::tuple<A, B> produce(A) { return {}; }
-em::tuple<A> produce(B) { return {}; }
+auto produce(A) -> em::tuple<A, B> { return {}; }
+auto produce(B) -> em::tuple<A> { return {}; }
 
 static_assert(std::is_same_v<decltype(produce<1>(A{})), em::tuple<A, B>>);
 static_assert(std::is_same_v<decltype(produce<2>(A{})), em::tuple<A, B, A>>);
