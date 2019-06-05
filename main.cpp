@@ -82,8 +82,8 @@ auto produce(em::tuple<I, J, Is...> T) -> decltype(
 // Base template for implementation of a repeated call to `produce`.
 // Naively writing this as one function and trying to put the result in the
 // return type, such as with
-//template <int N, class Arg>
-//auto produce(Arg) -> std::conditional_t<
+// template <int N, class Arg>
+// auto produce(Arg) -> std::conditional_t<
 //    N == 0, Arg, decltype(produce(decltype(produce<N - 1, Arg>(Arg{})){}))>;
 // causes an infinite descent of template instantiation.
 // Partially specializing for the N == 0 case and calling this via a function
