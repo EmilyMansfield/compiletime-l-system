@@ -6,8 +6,8 @@ Evolve tuples of types according to the rules of an L-system. For example,
 struct A : Symbol<'a'> {};
 struct B : Symbol<'b'> {};
 
-em::tuple<A, B> produce(A) { return {}; }
-em::tuple<A> produce(B) { return {}; }
+auto produce(A) -> em::tuple<A, B>;
+auto produce(B) -> em::tuple<A>;
 
 static_assert(std::is_same_v<decltype(produce<3>(A{})),
               em::tuple<A, B, A, A, B>>);
