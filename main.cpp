@@ -55,6 +55,9 @@ static_assert(em::tuple_size_v<R> == 4);
 
 //===----------------------------------------------------------------------===//
 // Implementation functions.
+// Since the contents of the tuples are irrelevant, most of these functions
+// don't actually need to be defined. It's assumed that the Symbol types have a
+// definition and are default constructible though, so we can avoid declval.
 //===----------------------------------------------------------------------===//
 template <char Name> struct Symbol {
   constexpr static inline char name = Name;
@@ -62,19 +65,39 @@ template <char Name> struct Symbol {
 
 // Really simple substitute for em::tuple_cat that only cares about types.
 template <class... Is, class... Js>
-auto join(em::tuple<Is...> T1, em::tuple<Js...> T2) -> em::tuple<Is..., Js...> {
-  return {};
-}
+auto join(em::tuple<Is...>, em::tuple<Js...>) -> em::tuple<Is..., Js...>;
 
 // Base cases for applying productions to tuples.
-template <class I> auto produce(em::tuple<I> T) { return produce(I{}); }
-auto produce(em::tuple<>) -> em::tuple<> { return {}; }
+template <class I>
+auto produce(em::tuple<I>) -> decltype(produce(std::declval<I>()));
+auto produce(em::tuple<>) -> em::tuple<>;
 
 // Apply production rules in parallel to each element of the tuple.
 template <class I, class J, class... Is>
-auto produce(em::tuple<I, J, Is...> T) {
-  return join(produce(I{}), join(produce(J{}), produce(em::tuple<Is...>{})));
-}
+auto produce(em::tuple<I, J, Is...> T) -> decltype(
+    join(decltype(produce(I{})){},
+         decltype(join(decltype(produce(J{})){},
+                       decltype(produce(em::tuple<Is...>{})){})){}));
+
+// Base template for implementation of a repeated call to `produce`.
+// Naively writing this as one function and trying to put the result in the
+// return type, such as with
+//template <int N, class Arg>
+//auto produce(Arg) -> std::conditional_t<
+//    N == 0, Arg, decltype(produce(decltype(produce<N - 1, Arg>(Arg{})){}))>;
+// causes an infinite descent of template instantiation.
+// Partially specializing for the N == 0 case and calling this via a function
+// template avoids that.
+// Of course none of this machinery is necessary if we just wrote an ordinary
+// function with a definition, but where's the fun in that?
+template <int N, class Arg> struct produce_impl {
+  auto operator()(Arg)
+      -> decltype(produce(decltype(produce_impl<N - 1, Arg>{}(Arg{})){}));
+};
+
+template <class Arg> struct produce_impl<0, Arg> {
+  auto operator()(Arg) -> Arg;
+};
 
 // Set the I-th character in the array to the name of the I-th symbol.
 // T should be a tuple of symbols and Arr an array of characters at least as
@@ -94,16 +117,13 @@ template <std::size_t I, class T, class Arr> void getName(Arr &arr) {
 }
 
 //===----------------------------------------------------------------------===//
-// Interface functions, go ahead and call these.
+// Interface functions, go ahead and use these.
+// `produce` isn't designed to actually be called; wrap it in a decltype.
 //===----------------------------------------------------------------------===//
 
-// Run the production rules N times.
-template <int N, class Arg> auto produce(Arg a) {
-  if constexpr (N == 0)
-    return a;
-  else
-    return produce(produce<N - 1>(a));
-}
+// Run the produce rule N times.
+template <int N, class Arg>
+auto produce(Arg) -> decltype(produce_impl<N, Arg>{}(Arg{}));
 
 // Copy the names of each symbol in the word into the array.
 // T should be a tuple of symbols and Arr an array of characters at least as
@@ -112,18 +132,25 @@ template <class T, class Arr> void getName(Arr &arr) { getName<0, T>(arr); }
 
 //===----------------------------------------------------------------------===//
 // L-System definition.
-// Define the symbols by inheriting from `Symbol` and supplying a name.
+//
+// Define the symbols by inheriting from `Symbol` and supplying a name. The
+// symbols should be default constructible, and an empty definition is
+// sufficient.
+//
 // For each symbol, define the production rule by declaring a function
 // `produce` that takes that symbol and returns a word, represented as a tuple
-// of symbols.
+// of symbols. The production functions don't need to have a definition, since
+// they are never actually called. This makes them look more like the
+// mathematical notation for a production rule, which I think is nice.
+//
 // The example below is Lindenmayer's system for modelling algae growth:
 // https://en.wikipedia.org/wiki/L-system#Example_1:_Algae
 //===----------------------------------------------------------------------===//
 struct A : Symbol<'A'> {};
 struct B : Symbol<'B'> {};
 
-auto produce(A) -> em::tuple<A, B> { return {}; }
-auto produce(B) -> em::tuple<A> { return {}; }
+auto produce(A) -> em::tuple<A, B>;
+auto produce(B) -> em::tuple<A>;
 
 static_assert(std::is_same_v<decltype(produce<1>(A{})), em::tuple<A, B>>);
 static_assert(std::is_same_v<decltype(produce<2>(A{})), em::tuple<A, B, A>>);
