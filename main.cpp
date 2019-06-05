@@ -106,14 +106,13 @@ template <std::size_t I, class T, class Arr> void setChar(Arr &arr) {
   arr[I] = em::tuple_element_t<I, T>::name;
 }
 
-// Copy the names of each symbol in the word into the array, starting from I.
+// Copy the names of each symbol in the word into the array.
 // T should be a tuple of symbols and Arr an array of characters at least as
-// long as the tuple.
-template <std::size_t I, class T, class Arr> void getName(Arr &arr) {
-  if constexpr (I < em::tuple_size<T>::value) {
-    setChar<I, T>(arr);
-    getName<I + 1, T>(arr);
-  }
+// long as the tuple. The length of the index sequence should equal the length
+// of the tuple.
+template <class T, class Arr, std::size_t... Is>
+void getNameImpl(Arr &arr, std::index_sequence<Is...> is) {
+  std::array a{(setChar<Is, T>(arr), 0)...};
 }
 
 //===----------------------------------------------------------------------===//
@@ -128,7 +127,9 @@ auto produce(Arg) -> decltype(produce_impl<N, Arg>{}(Arg{}));
 // Copy the names of each symbol in the word into the array.
 // T should be a tuple of symbols and Arr an array of characters at least as
 // long as the tuple.
-template <class T, class Arr> void getName(Arr &arr) { getName<0, T>(arr); }
+template <class T, class Arr> void getName(Arr &arr) {
+  getNameImpl<T>(arr, std::make_index_sequence<em::tuple_size<T>::value>{});
+}
 
 //===----------------------------------------------------------------------===//
 // L-System definition.
