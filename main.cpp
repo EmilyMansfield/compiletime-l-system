@@ -90,14 +90,11 @@ auto produce(em::tuple<I, J, Is...> T) -> decltype(
 // template avoids that.
 // Of course none of this machinery is necessary if we just wrote an ordinary
 // function with a definition, but where's the fun in that?
-template <int N, class Arg> struct produce_impl {
-  auto operator()(Arg)
-      -> decltype(produce(decltype(produce_impl<N - 1, Arg>{}(Arg{})){}));
+template <int N, class A> struct produceImpl {
+  auto operator()() -> decltype(produce(decltype(produceImpl<N - 1, A>{}()){}));
 };
 
-template <class Arg> struct produce_impl<0, Arg> {
-  auto operator()(Arg) -> Arg;
-};
+template <class A> struct produceImpl<0, A> { auto operator()() -> A; };
 
 // Set the I-th character in the array to the name of the I-th symbol.
 // T should be a tuple of symbols and Arr an array of characters at least as
@@ -122,7 +119,7 @@ void getNameImpl(Arr &arr, std::index_sequence<Is...> is) {
 
 // Run the produce rule N times.
 template <int N, class Arg>
-auto produce(Arg) -> decltype(produce_impl<N, Arg>{}(Arg{}));
+auto produce(Arg) -> decltype(produceImpl<N, Arg>{}());
 
 // Copy the names of each symbol in the word into the array.
 // T should be a tuple of symbols and Arr an array of characters at least as
