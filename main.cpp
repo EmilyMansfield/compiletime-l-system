@@ -108,8 +108,8 @@ template <std::size_t I, class T, class Arr> void setChar(Arr &arr) {
 // long as the tuple. The length of the index sequence should equal the length
 // of the tuple.
 template <class T, class Arr, std::size_t... Is>
-void getNameImpl(Arr &arr, std::index_sequence<Is...> is) {
-  std::array a{(setChar<Is, T>(arr), 0)...};
+void getNameImpl(Arr &arr, std::index_sequence<Is...>) {
+  [[maybe_unused]] std::array a{(setChar<Is, T>(arr), 0)...};
 }
 
 //===----------------------------------------------------------------------===//
