@@ -156,8 +156,19 @@ template <class T, class Arr> void getName(Arr &arr) {
 // they are never actually called. This makes them look more like the
 // mathematical notation for a production rule, which I think is nice.
 //
-// The example below is Lindenmayer's system for modelling algae growth:
-// https://en.wikipedia.org/wiki/L-system#Example_1:_Algae
+// Several examples are presented below.
+//===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
+// 1. Lindenmayer's system for modelling algae growth.
+//
+// This is the canonical example of an L-system (see basically any book on
+// L-systems or https://en.wikipedia.org/wiki/L-system#Example_1:_Algae) and
+// consists of the production rules:
+// I : A
+// p0: A -> AB
+// p1: -> A
+// The function `printExample` shows how to print the result.
 //===----------------------------------------------------------------------===//
 struct A : Symbol<'A'> {};
 struct B : Symbol<'B'> {};
@@ -170,9 +181,66 @@ static_assert(std::is_same_v<decltype(produce<2>(A{})), em::tuple<A, B, A>>);
 static_assert(
     std::is_same_v<decltype(produce<3>(A{})), em::tuple<A, B, A, A, B>>);
 
-int main() {
+void printExample1() {
   using R = decltype(produce<10>(A{}));
   std::array<char, em::tuple_size<R>::value + 1> chars{};
   getName<R>(chars);
   printf("%s\n", chars.data());
+}
+
+//===----------------------------------------------------------------------===//
+// 2. A parametric L-System
+//
+// This example is taken from (1.7) in 'The Algorithmic Beauty of Plants', and
+// illustrates how to implement a parametric L-system using class templates for
+// symbols and SFINAE. Parametric L-systems allow the symbols to have finitely
+// many parameters and each production rule is associated with a predicate that
+// must be satisfied by the paramters for the rule to be selected. The L-system
+// here is:
+// I : V(2) U(4, 4)
+// p1: U(X, Y) : Y <= 3 -> U(2 * X, X + Y)
+// p2: U(X, Y) : Y > 3  -> V(X) U(X / Y, 0)
+// p3: V(X)    : X < 1  -> W
+// p4: W -> W
+//
+// This is supported using the exact same machinery used to implement
+// nonparametric L-systems if now the symbols are replaced by class templates
+// with non-type template parameters and the production rules replaced by
+// function templates that SFINAE away when the predicate is false.
+//
+// The definition of a parametric L-system requires the parameters be real,
+// but non-type template parameters may not be of floating-point type and so the
+// parameters here are restricted to integers instead.
+// TODO: Try out `std::ratio` as a replacement of `int`.
+//
+// Printing a parametric L-system is not yet supported because the parameters
+// cannot be passed to `Symbol`.
+//===----------------------------------------------------------------------===//
+template <int X, int Y> struct U {};
+template <int X> struct V {};
+struct W {};
+
+template <int X, int Y, class = std::enable_if_t<(Y <= 3)>>
+auto produce(U<X, Y>) -> em::tuple<U<2 * X, X + Y>>;
+
+template <int X, int Y, class = std::enable_if_t<(Y > 3)>>
+auto produce(U<X, Y>) -> em::tuple<V<X>, U<X / Y, 0>>;
+
+template <int X, class = std::enable_if_t<(X < 1)>>
+auto produce(V<X>) -> em::tuple<W>;
+
+template <int X, class = std::enable_if_t<(X >= 1)>>
+auto produce(V<X>) -> em::tuple<V<X - 1>>;
+
+auto produce(W) -> em::tuple<W>;
+
+static_assert(std::is_same_v<decltype(produce<1>(em::tuple<V<2>, U<4, 4>>{})),
+                             em::tuple<V<1>, V<4>, U<1, 0>>>);
+static_assert(std::is_same_v<decltype(produce<2>(em::tuple<V<2>, U<4, 4>>{})),
+                             em::tuple<V<0>, V<3>, U<2, 1>>>);
+static_assert(std::is_same_v<decltype(produce<3>(em::tuple<V<2>, U<4, 4>>{})),
+                             em::tuple<W, V<2>, U<4, 3>>>);
+
+int main() {
+  printExample1();
 }
