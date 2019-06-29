@@ -1,3 +1,5 @@
+#include "fmt.hpp"
+#include "tuple.hpp"
 #include <array>
 #include <cstdio>
 #include <type_traits>
@@ -6,67 +8,14 @@
 // Silly and simple compile-time L-systems. Jump to the bottom for an example!
 //===---------------------------------------------------------------------===//
 
-//===---------------------------------------------------------------------===//
-// Replacement for std::tuple.
-// Everything works with std::tuple, it's just *very* memory hungry. We just
-// need an ordered type container and a few helper functions surrounding it,
-// not all of std::tuple's magic or even the ability to store data.
-//===---------------------------------------------------------------------===//
-namespace em {
-
-template <class... Ts> struct tuple {};
-
-// std::tuple_element replacement
-// The naive recursive approach used below is slow and uses a lot of memory,
-// but it's still a lot better than std::tuple. On Clang we can use a builtin
-// function to do much better.
-
-// Workaround for compilers other than Clang.
-#ifndef __has_builtin
-#define __has_builtin(x) 0
-#endif
-
-#if defined(__clang__) && __has_builtin(__type_pack_element)
-template <std::size_t I, class... Ts>
-auto tuple_element_f(em::tuple<Ts...>) -> __type_pack_element<I, Ts...>;
-#else
-template <std::size_t I, class T, class... Ts> struct tuple_element_impl {
-  using type = typename tuple_element_impl<I - 1, Ts...>::type;
-};
-
-template <class T, class... Ts> struct tuple_element_impl<0, T, Ts...> {
-  using type = T;
-};
-
-template <std::size_t I, class... Ts>
-auto tuple_element_f(em::tuple<Ts...>) ->
-    typename tuple_element_impl<I, Ts...>::type;
-#endif
-
-template <std::size_t I, class T> struct tuple_element {
-  using type = decltype(tuple_element_f<I>(std::declval<T>()));
-};
-
-template <std::size_t I, class T>
-using tuple_element_t = typename tuple_element<I, T>::type;
-
-// std::tuple_size replacement
-template <class T> struct tuple_size;
-template <class... Ts>
-struct tuple_size<em::tuple<Ts...>>
-    : std::integral_constant<std::size_t, sizeof...(Ts)> {};
-
-template <class T>
-static constexpr inline std::size_t tuple_size_v = tuple_size<T>::value;
-
-// 'Tests'
+// 'Tests' for em::tuple
 namespace {
+
 using R = em::tuple<int, float, char, float>;
 static_assert(std::is_same_v<em::tuple_element_t<2, R>, char>);
 static_assert(em::tuple_size_v<R> == 4);
-} // namespace
 
-} // namespace em
+} // namespace
 
 //===----------------------------------------------------------------------===//
 // Implementation functions.
@@ -111,22 +60,6 @@ template <int N, class A> struct produceImpl {
 
 template <class A> struct produceImpl<0, A> { auto operator()() -> A; };
 
-// Set the I-th character in the array to the name of the I-th symbol.
-// T should be a tuple of symbols and Arr an array of characters at least as
-// long as the tuple.
-template <std::size_t I, class T, class Arr> void setChar(Arr &arr) {
-  arr[I] = em::tuple_element_t<I, T>::name;
-}
-
-// Copy the names of each symbol in the word into the array.
-// T should be a tuple of symbols and Arr an array of characters at least as
-// long as the tuple. The length of the index sequence should equal the length
-// of the tuple.
-template <class T, class Arr, std::size_t... Is>
-void getNameImpl(Arr &arr, std::index_sequence<Is...>) {
-  [[maybe_unused]] std::array a{(setChar<Is, T>(arr), 0)...};
-}
-
 //===----------------------------------------------------------------------===//
 // Interface functions, go ahead and use these.
 // `produce` isn't designed to actually be called; wrap it in a decltype.
@@ -135,13 +68,6 @@ void getNameImpl(Arr &arr, std::index_sequence<Is...>) {
 // Run the produce rule N times.
 template <int N, class Arg>
 auto produce(Arg) -> decltype(produceImpl<N, Arg>{}());
-
-// Copy the names of each symbol in the word into the array.
-// T should be a tuple of symbols and Arr an array of characters at least as
-// long as the tuple.
-template <class T, class Arr> void getName(Arr &arr) {
-  getNameImpl<T>(arr, std::make_index_sequence<em::tuple_size<T>::value>{});
-}
 
 //===----------------------------------------------------------------------===//
 // L-System definition.
@@ -183,8 +109,7 @@ static_assert(
 
 void printExample1() {
   using R = decltype(produce<10>(A{}));
-  std::array<char, em::tuple_size<R>::value + 1> chars{};
-  getName<R>(chars);
+  auto chars = em::formatWord(R{});
   printf("%s\n", chars.data());
 }
 
@@ -212,13 +137,10 @@ void printExample1() {
 // but non-type template parameters may not be of floating-point type and so the
 // parameters here are restricted to integers instead.
 // TODO: Try out `std::ratio` as a replacement of `int`.
-//
-// Printing a parametric L-system is not yet supported because the parameters
-// cannot be passed to `Symbol`.
 //===----------------------------------------------------------------------===//
-template <int X, int Y> struct U {};
-template <int X> struct V {};
-struct W {};
+template <int X, int Y> struct U : Symbol<'U'> {};
+template <int X> struct V : Symbol<'V'> {};
+struct W : Symbol<'W'> {};
 
 template <int X, int Y, class = std::enable_if_t<(Y <= 3)>>
 auto produce(U<X, Y>) -> em::tuple<U<2 * X, X + Y>>;
@@ -241,6 +163,13 @@ static_assert(std::is_same_v<decltype(produce<2>(em::tuple<V<2>, U<4, 4>>{})),
 static_assert(std::is_same_v<decltype(produce<3>(em::tuple<V<2>, U<4, 4>>{})),
                              em::tuple<W, V<2>, U<4, 3>>>);
 
+void printExample2() {
+  using R = decltype(produce<10>(em::tuple<V<2>, U<4, 4>>{}));
+  auto chars = em::formatWord(R{});
+  printf("%s\n", chars.data());
+}
+
 int main() {
   printExample1();
+  printExample2();
 }
