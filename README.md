@@ -13,7 +13,7 @@ static_assert(std::is_same_v<decltype(produce<3>(A{})),
               em::tuple<A, B, A, A, B>>);
 ```
 
-Parametric L-systems are also supported.
+Parametric L-systems are also supported, as are stochastic L-systems.
 
 An [*L-system*](https://en.wikipedia.org/wiki/L-system) is a parallel rewriting
 system that takes an initial string of symbols, called a word, and
